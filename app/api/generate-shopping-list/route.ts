@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const response = await fetch(`${apiUrl}/generate-shopping-list`, {
+    const response = await fetch(`${apiUrl}/match-shopping-list`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

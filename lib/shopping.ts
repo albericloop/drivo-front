@@ -33,7 +33,7 @@ function fromCandidate(candidate: unknown, fallbackName: string): DisplayItem | 
     fallbackName;
   const code = digitsOnly(
     pickString(record, ["gtin", "ean", "code", "barcode", "numero"]),
-  );
+  ).slice(0, 14);
 
   if (!intitule && !code) {
     return null;
