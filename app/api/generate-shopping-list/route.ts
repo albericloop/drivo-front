@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const response = await fetch(`${apiUrl}/match-shopping-list`, {
+    const response = await fetch(`${apiUrl}/generate-shopping-list`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Impossible de joindre l'API Drivo.";
+      error instanceof Error ? error.message : "Impossible de joindre l'API QUEECH.";
 
     return NextResponse.json(
       { detail: message },

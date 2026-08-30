@@ -97,7 +97,7 @@ export default function HomePage() {
       setStatus("success");
     } catch {
       setStatus("error");
-      setError("Impossible de contacter l'API Drivo.");
+      setError("Impossible de contacter l'API QUEECH.");
     }
   }
 
@@ -112,7 +112,7 @@ export default function HomePage() {
             className="mt-1 text-5xl tracking-tight text-[#1a1916] sm:text-6xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
-            Drivo
+            QUEECH
           </h1>
         </div>
         <p className="hidden max-w-xs text-right text-sm leading-6 text-[#5e5a52] sm:block">

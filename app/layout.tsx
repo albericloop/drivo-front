@@ -13,7 +13,7 @@ const sans = Source_Sans_3({
 });
 
 export const metadata: Metadata = {
-  title: "Drivo",
+  title: "QUEECH",
   description:
     "Transformez une liste de courses et un nombre de personnes en produits identifiés.",
 };
