@@ -105,15 +105,15 @@ export default function HomePage() {
     <main className="mx-auto min-h-screen max-w-5xl px-5 py-8 sm:px-8 sm:py-12">
       <header className="mb-10 flex items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-medium tracking-[0.22em] text-[#1f6b45] uppercase">
-            Liste intelligente
-          </p>
           <h1
-            className="mt-1 text-5xl tracking-tight text-[#1a1916] sm:text-6xl"
+            className="text-5xl tracking-tight text-[#1a1916] sm:text-6xl"
             style={{ fontFamily: "var(--font-display)" }}
           >
             QUEECH
           </h1>
+          <p className="mt-2 text-sm font-medium tracking-[0.08em] text-[#1f6b45]">
+            Ta liste de course augmentée
+          </p>
         </div>
         <p className="hidden max-w-xs text-right text-sm leading-6 text-[#5e5a52] sm:block">
           Entrez vos produits ou recettes, le nombre de convives, et récupérez les articles identifiés.
