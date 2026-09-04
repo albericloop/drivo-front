@@ -1,28 +1,36 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { DisplayItem, normalizeItems, parseShoppingList } from "@/lib/shopping";
+import {
+  CatalogHit,
+  MatchResult,
+  formatNeed,
+  normalizeResults,
+  parseShoppingList,
+} from "@/lib/shopping";
 
 type Status = "idle" | "loading" | "error" | "success";
 
 function formatApiError(payload: unknown, status: number): string {
-  if (payload && typeof payload === "object" && "detail" in payload) {
-    const detail = (payload as { detail: unknown }).detail;
-    if (typeof detail === "string") {
-      return detail;
-    }
-    if (detail && typeof detail === "object") {
-      return JSON.stringify(detail);
+  if (payload && typeof payload === "object") {
+    const record = payload as { error?: unknown; detail?: unknown };
+    for (const value of [record.error, record.detail]) {
+      if (typeof value === "string" && value.trim()) {
+        return value;
+      }
+      if (value && typeof value === "object") {
+        return JSON.stringify(value);
+      }
     }
   }
-  return `L'API a renvoyé une erreur (${status}).`;
+  return `Le matcher a renvoyé une erreur (${status}).`;
 }
 
 function Barcode({ code }: { code: string }) {
   const bars = useMemo(() => {
-    const digits = code.padEnd(13, "0").slice(0, 13);
-    return digits.split("").flatMap((digit, index) => {
-      const n = Number(digit);
+    const chars = code || "0";
+    return chars.split("").flatMap((char, index) => {
+      const n = Number(/\d/.test(char) ? char : char.charCodeAt(0) % 10);
       const width = 1 + (n % 3);
       const gap = 1 + ((n + index) % 2);
       return [
@@ -43,9 +51,53 @@ function Barcode({ code }: { code: string }) {
           />
         ))}
       </div>
-      <p className="mt-1 text-center font-mono text-sm tracking-[0.28em] text-[#1a1916]">
+      <p className="mt-1 text-center font-mono text-sm tracking-[0.18em] text-[#1a1916]">
         {code}
       </p>
+    </div>
+  );
+}
+
+function CatalogCard({
+  hit,
+  variant,
+}: {
+  hit: CatalogHit;
+  variant: "primary" | "alt";
+}) {
+  return (
+    <div
+      className={
+        variant === "primary"
+          ? "rounded-2xl border border-[#e6dfd2] bg-white p-4"
+          : "rounded-xl border border-[#eee8dc] bg-[#fffdf8] px-3 py-3"
+      }
+    >
+      <p
+        className={
+          variant === "primary"
+            ? "text-base font-semibold leading-snug text-[#1a1916]"
+            : "text-sm font-medium leading-snug text-[#1a1916]"
+        }
+      >
+        {hit.name || "Produit catalogue"}
+      </p>
+      <p className="mt-1 text-sm text-[#5e5a52]">
+        {hit.quantity ? `Pack : ${hit.quantity}` : "Conditionnement inconnu"}
+        {" · "}
+        {hit.units_to_buy} à acheter
+      </p>
+      {hit.ean ? (
+        variant === "primary" ? (
+          <Barcode code={hit.ean} />
+        ) : (
+          <p className="mt-1 font-mono text-xs tracking-widest text-[#5e5a52]">{hit.ean}</p>
+        )
+      ) : (
+        <p className="mt-2 font-mono text-sm tracking-widest text-[#9a9488]">
+          Code indisponible
+        </p>
+      )}
     </div>
   );
 }
@@ -55,7 +107,7 @@ export default function HomePage() {
   const [list, setList] = useState("pâtes\ntomates\nbasilic\nparmesan");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
-  const [items, setItems] = useState<DisplayItem[]>([]);
+  const [results, setResults] = useState<MatchResult[]>([]);
 
   const parsed = parseShoppingList(list);
 
@@ -63,7 +115,8 @@ export default function HomePage() {
     event.preventDefault();
     setError("");
 
-    if (people < 1) {
+    const p = Number(people);
+    if (!Number.isInteger(p) || p < 1) {
       setStatus("error");
       setError("Indiquez au moins une personne.");
       return;
@@ -81,7 +134,7 @@ export default function HomePage() {
       const response = await fetch("/api/generate-shopping-list", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ p: people, c: parsed }),
+        body: JSON.stringify({ p, c: parsed, limit: 5 }),
       });
 
       const payload = await response.json();
@@ -92,12 +145,11 @@ export default function HomePage() {
         return;
       }
 
-      const nextItems = normalizeItems(payload);
-      setItems(nextItems);
+      setResults(normalizeResults(payload));
       setStatus("success");
     } catch {
       setStatus("error");
-      setError("Impossible de contacter l'API QUEECH.");
+      setError("Impossible de contacter le matcher Drivo.");
     }
   }
 
@@ -140,8 +192,12 @@ export default function HomePage() {
             <input
               type="number"
               min={1}
+              step={1}
               value={people}
-              onChange={(event) => setPeople(Number(event.target.value) || 1)}
+              onChange={(event) => {
+                const next = parseInt(event.target.value, 10);
+                setPeople(Number.isFinite(next) ? next : 1);
+              }}
               className="h-11 w-20 rounded-2xl border border-[#d8d0c2] bg-white text-center text-lg outline-none focus:border-[#1f6b45]"
             />
             <button
@@ -194,48 +250,72 @@ export default function HomePage() {
             </h2>
             {status === "success" ? (
               <span className="text-sm text-[#5e5a52]">
-                {items.length} résultat{items.length > 1 ? "s" : ""}
+                {results.length} résultat{results.length > 1 ? "s" : ""}
               </span>
             ) : null}
           </div>
 
           {status === "idle" ? (
             <p className="text-[#5e5a52]">
-              La liste générée apparaîtra ici, avec l&apos;intitulé et le code à 13 chiffres de chaque article.
+              La liste générée apparaîtra ici, avec l&apos;intitulé catalogue et le code EAN de chaque article.
             </p>
           ) : null}
 
           {status === "loading" ? (
-            <p className="text-[#5e5a52]">Analyse de votre liste…</p>
+            <p className="text-[#5e5a52]">Analyse de votre liste… cela peut prendre quelques secondes.</p>
           ) : null}
 
-          {status === "success" && items.length === 0 ? (
+          {status === "success" && results.length === 0 ? (
             <p className="text-[#5e5a52]">Aucun article n&apos;a été renvoyé.</p>
           ) : null}
 
-          <ul className="grid gap-3">
-            {items.map((item, index) => (
-              <li
-                key={`${item.code}-${item.intitule}-${index}`}
-                className="rounded-2xl border border-[#e6dfd2] bg-white p-4"
-              >
-                <p className="text-lg font-semibold leading-snug text-[#1a1916]">
-                  {item.intitule || "Article sans intitulé"}
-                </p>
-                {item.quantity && item.unit ? (
-                  <p className="mt-1 text-sm text-[#5e5a52]">
-                    {item.quantity} {item.unit}
+          <ul className="grid gap-4">
+            {results.map((item, index) => {
+              const selected = item.products[0];
+              const alternatives = item.products.slice(1);
+              const need = formatNeed(item.quantity, item.unit);
+
+              return (
+                <li
+                  key={`${item.product}-${index}`}
+                  className="rounded-2xl border border-[#e6dfd2] bg-white/70 p-4"
+                >
+                  <p className="text-lg font-semibold leading-snug text-[#1a1916]">
+                    {item.product || "Ingrédient"}
                   </p>
-                ) : null}
-                {item.code ? (
-                  <Barcode code={item.code} />
-                ) : (
-                  <p className="mt-2 font-mono text-sm tracking-widest text-[#9a9488]">
-                    Code indisponible
-                  </p>
-                )}
-              </li>
-            ))}
+                  {need ? (
+                    <p className="mt-1 text-sm text-[#5e5a52]">{need}</p>
+                  ) : null}
+
+                  {selected ? (
+                    <div className="mt-3">
+                      <CatalogCard hit={selected} variant="primary" />
+                    </div>
+                  ) : (
+                    <p className="mt-3 rounded-xl bg-[#f7f3ea] px-3 py-2 text-sm text-[#5e5a52]">
+                      Aucun produit catalogue pour cet ingrédient.
+                    </p>
+                  )}
+
+                  {alternatives.length > 0 ? (
+                    <details className="mt-3">
+                      <summary className="cursor-pointer text-sm font-medium text-[#1f6b45]">
+                        {alternatives.length} alternative{alternatives.length > 1 ? "s" : ""}
+                      </summary>
+                      <div className="mt-2 grid gap-2">
+                        {alternatives.map((hit, altIndex) => (
+                          <CatalogCard
+                            key={`${hit.ean}-${hit.name}-${altIndex}`}
+                            hit={hit}
+                            variant="alt"
+                          />
+                        ))}
+                      </div>
+                    </details>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         </section>
       </div>

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
-const DEFAULT_API_URL = "https://drivo-api-388238658031.europe-west1.run.app";
+const DEFAULT_MATCHER_URL =
+  "https://drivo-matcher-388238658031.europe-west1.run.app";
 
 export async function POST(request: Request) {
-  const apiUrl = (process.env.DRIVO_API_URL || DEFAULT_API_URL).replace(
+  const matcherUrl = (process.env.DRIVO_MATCHER_URL || DEFAULT_MATCHER_URL).replace(
     /\/$/,
     "",
   );
@@ -15,19 +16,38 @@ export async function POST(request: Request) {
     body = await request.json();
   } catch {
     return NextResponse.json(
-      { detail: "Le corps de la requête n'est pas un JSON valide." },
+      { error: "Le corps de la requête n'est pas un JSON valide." },
       { status: 400 },
     );
   }
 
+  if (!body || typeof body !== "object") {
+    return NextResponse.json(
+      { error: "Le corps de la requête n'est pas un JSON valide." },
+      { status: 400 },
+    );
+  }
+
+  const record = body as Record<string, unknown>;
+  const p = Number(record.p);
+  const c = record.c;
+  const limit =
+    record.limit === undefined || record.limit === null
+      ? 5
+      : Number(record.limit);
+
   try {
-    const response = await fetch(`${apiUrl}/generate-shopping-list`, {
+    const response = await fetch(`${matcherUrl}/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        p,
+        c,
+        limit: Number.isFinite(limit) ? limit : 5,
+      }),
     });
 
     const text = await response.text();
@@ -37,8 +57,13 @@ export async function POST(request: Request) {
         data = JSON.parse(text);
       } catch {
         return NextResponse.json(
-          { detail: "La réponse de l'API n'est pas un JSON valide." },
-          { status: 502 },
+          {
+            error:
+              response.status === 504
+                ? "Le matcher a dépassé le délai Cloud Run."
+                : "La réponse du matcher n'est pas un JSON valide.",
+          },
+          { status: response.status === 504 ? 504 : 502 },
         );
       }
     }
@@ -46,11 +71,10 @@ export async function POST(request: Request) {
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Impossible de joindre l'API QUEECH.";
+      error instanceof Error
+        ? error.message
+        : "Impossible de joindre le matcher Drivo.";
 
-    return NextResponse.json(
-      { detail: message },
-      { status: 502 },
-    );
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 }
